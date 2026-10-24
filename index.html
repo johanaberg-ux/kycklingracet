@@ -65,7 +65,7 @@ ol li .s{margin-left:auto;font-variant-numeric:tabular-nums}
       <button id="watch" class="ghost">Titta på storskärm 📺</button>
     </div>
     <div id="qr"></div>
-    <div class="room">Rum <b id="roomcode"></b> · <span id="netstat">Ansluter …</span></div>
+    <div class="room">Version <b id="roomcode"></b> · <span id="netstat">Ansluter …</span></div>
     <div id="plist" class="plist"></div>
     <p id="note" class="note"></p>
     <p class="how">Tryck = hoppa framåt · Svep = åt sidan eller bakåt<br>På datorn: piltangenterna</p>
@@ -175,9 +175,10 @@ try { Object.assign(prof, JSON.parse(localStorage.getItem('kr-prof') || '{}')); 
 let watching = false;
 const myId = Math.random().toString(36).slice(2, 10);
 const myColor = COLORS[Math.floor(Math.random()*COLORS.length)];
-// Utan rumskod hamnar alla i samma rum, så att alla som öppnar länken spelar ihop
-let room = ((location.hash.match(/^#([a-z0-9]{3,8})$/i) || [])[1] || 'lek').toLowerCase();
-const inviteUrl = () => location.origin + location.pathname + (room === 'lek' ? '' : '#' + room);
+// Ett enda rum för alla. Gamla rumskoder i länken (#abcd) ignoreras och tas bort.
+const room = 'lek';
+if (location.hash || location.search) history.replaceState(null, '', location.pathname);
+const inviteUrl = () => location.origin + location.pathname;
 function saveProf(){ try { localStorage.setItem('kr-prof', JSON.stringify({ name:prof.name, emoji:prof.emoji })); } catch (e) {} }
 const cleanName = s => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 14);
 
@@ -533,7 +534,7 @@ function buildPick(){
 $('name').value = prof.name || '';
 $('name').addEventListener('input', e => { prof.name = cleanName(e.target.value); saveProf(); trackMe(); renderLobby(); });
 $('name').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
-$('roomcode').textContent = room.toUpperCase();
+$("roomcode").textContent = "3";
 $('go').onclick = () => { beep(440, .05); startRound(); };
 $('again').onclick = () => startRound();
 $('tolobby').onclick = () => { phase = 'lobby'; round = null; others = {}; $('results').hidden = true; $('lobby').hidden = false; initWorld(20261024); camRow = -1; renderLobby(); };
