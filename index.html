@@ -175,14 +175,9 @@ try { Object.assign(prof, JSON.parse(localStorage.getItem('kr-prof') || '{}')); 
 let watching = false;
 const myId = Math.random().toString(36).slice(2, 10);
 const myColor = COLORS[Math.floor(Math.random()*COLORS.length)];
-let room = (location.hash.match(/^#([a-z0-9]{3,8})$/i) || [])[1];
-if (!room){
-  const A = 'abcdefghjkmnpqrstuvwxyz23456789';
-  room = Array.from({length:4}, () => A[Math.floor(Math.random()*A.length)]).join('');
-  history.replaceState(null, '', '#' + room);
-}
-room = room.toLowerCase();
-const inviteUrl = () => location.origin + location.pathname + '#' + room;
+// Utan rumskod hamnar alla i samma rum, så att alla som öppnar länken spelar ihop
+let room = ((location.hash.match(/^#([a-z0-9]{3,8})$/i) || [])[1] || 'lek').toLowerCase();
+const inviteUrl = () => location.origin + location.pathname + (room === 'lek' ? '' : '#' + room);
 function saveProf(){ try { localStorage.setItem('kr-prof', JSON.stringify({ name:prof.name, emoji:prof.emoji })); } catch (e) {} }
 const cleanName = s => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 14);
 
@@ -225,7 +220,7 @@ function onPos(p){
 }
 
 // ---------- Spelets tillstånd ----------
-let phase = 'lobby', round = null, tw = 0, camRow = -1, camAuto = 0, sendT = 0, best = 0;
+let lastCount = 0, phase = 'lobby', round = null, tw = 0, camRow = -1, camAuto = 0, sendT = 0, best = 0;
 try { best = +localStorage.getItem('kr-best') || 0; } catch (e) {}
 const me = { px:4.5, row:0, maxRow:0, alive:true, hop:null, queue:null, how:'', deadAt:0, lastProg:0 };
 initWorld(20261024);
@@ -288,7 +283,12 @@ function update(dt){
   const now = performance.now();
   if (round){
     tw = (now - round.start)/1000;
-    if (phase === 'count' && tw >= 0){ phase = 'play'; beep(880, .25, 'square', .07); me.lastProg = now; }
+    if (phase === 'count'){
+      const n = Math.ceil(-tw);
+      if (n !== lastCount && n > 0 && n <= 3){ beep(440, .15, 'square', .07); if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {} }
+      lastCount = n;
+    }
+    if (phase === 'count' && tw >= 0){ phase = 'play'; beep(880, .35, 'square', .08); me.lastProg = now; }
   } else tw = now/1000;
 
   if (phase === 'play' && me.alive){
@@ -460,10 +460,13 @@ function draw(){
     });
   }
   if (phase === 'count'){
-    const n = Math.ceil(-tw);
-    txt(n > 0 ? String(n) : 'KÖR!', W/2, H*.42, Math.min(W*.35, 180), n === 1 ? '#22c55e' : n === 2 ? '#ffcc00' : '#ff4040');
-    if (watching) txt('Rum ' + room.toUpperCase(), W/2, H*.42 + 120, 28, '#fff');
+    const n = Math.ceil(-tw), k = 1 - mod(-tw, 1);
+    const n2 = Object.keys(others).length + (watching ? 0 : 1);
+    if (n > 3) txt('Gör er redo!', W/2, H*.42, Math.min(W*.12, 64), '#fff');
+    else txt(String(n), W/2, H*.42, Math.min(W*.35, 180)*(1 + k*.4), n === 1 ? '#22c55e' : n === 2 ? '#ffcc00' : '#ff4040');
+    txt(`${n2} ${n2 === 1 ? 'spelare' : 'spelare'} i racet`, W/2, H*.42 + Math.min(W*.3, 150), Math.min(W*.06, 28), '#fff');
   }
+  if (phase === 'play' && tw < 1) txt('KÖR!', W/2, H*.42, Math.min(W*.3, 160)*(1 + tw*.5), '#22c55e');
   if (phase === 'play' && !watching && !me.alive){
     const msg = { car:'Påkörd! 🚗', water:'Plask! 🌊', train:'Tåget! 🚂', eagle:'Örnen tog dig! 🦅' }[me.how] || 'Aj!';
     txt(msg, W/2, H*.3, Math.min(W*.1, 54), '#fff');
@@ -513,8 +516,10 @@ function renderLobby(){
   }
   const busy = performance.now() - lastForeign < 3000;
   $('note').textContent = busy ? 'Ett race pågår just nu. Du kommer med i nästa!' : '';
+  const np = list.filter(p => !p.watch).length;
   $('go').disabled = !watching && !cleanName(prof.name);
-  $('go').textContent = watching ? 'STARTA RACET 🏁' : (cleanName(prof.name) ? 'STARTA RACET 🏁' : 'Skriv ditt namn först');
+  $('go').textContent = watching || cleanName(prof.name) ? (np > 1 ? `STARTA FÖR ALLA ${np} 🏁` : 'STARTA RACET 🏁') : 'Skriv ditt namn först';
+  if (!busy) $('note').textContent = np > 1 ? 'Alla i rummet räknar ner 3-2-1 samtidigt när någon trycker start.' : 'Väntar på kompisar … be dem öppna samma länk.';
 }
 function buildPick(){
   const box = $('pick'); box.textContent = '';
